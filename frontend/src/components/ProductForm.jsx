@@ -100,8 +100,8 @@ function ProductForm({ formData, handleChange, handleSubmit, editingId }) {
                 <button
                     type="submit"
                     className={`w-full py-3.5 px-6  font-semibold text-white shadow-md transition-all duration-200 transform active:scale-[0.98] ${editingId
-                            ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-amber-500/25 hover:shadow-lg"
-                            : "bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-indigo-500/25 hover:shadow-lg"
+                        ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-amber-500/25 hover:shadow-lg"
+                        : "bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-indigo-500/25 hover:shadow-lg"
                         }`}
                 >
                     {editingId ? "Update Product" : "+ Add Product"}
