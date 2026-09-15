@@ -36,6 +36,8 @@ function Navbar() {
             <Link to="/" className="text-xl font-bold text-emerald-600">
                 MyApp</Link>
             <div className="flex items-center gap-4">
+            <Link to = "/users" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition">Users</Link>
+            <Link to = "/chat" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition">Chat</Link>
                 {/* Home is always visible */}
                 <Link
                     to="/"

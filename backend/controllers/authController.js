@@ -111,7 +111,7 @@ const verifyOtp = async (req, res) => {
         user.otp = null;
         user.otpExpiresAt = null;
         await user.save();
-        // const token = generateToken(user._id);
+        const token = generateToken(user._id);
         return res.status(200).json({
             success: true,
             message: "Email verified successfully",
@@ -226,7 +226,7 @@ const userLogin = async (req, res) => {
 }
 
 // forget password | change change password | reset password
-const resetOtp = async (req,res) => {
+const resetOtp = async (req, res) => {
     try {
         const { email } = req.body;
         if (!email) {
@@ -272,48 +272,48 @@ const resetPassword = async (req, res) => {
 
             });
         }
-            const user = await User.findOne({ email: email.toLowerCase().trim() });
-            if (!user) {
-                return res.status(400).json({
-                    success: false,
-                    message: "No account found with this email."
-                });
-            }
-            if (user.resetOtp !== otp) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid OTP."
-
-                });
-            }
-            if (Date.now() > new Date(user.resetOtpExpiresAt)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "OTP has expired. Please request a new one."
-                });
-
-            }
-            if (!passwordRegex.test(newPassword)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Password must be at least 8 characters and contain an uppercase letter, a number, and a special character.",
-                });
-            }
-            user.password = await bcrypt.hash(newPassword, 10);
-            user.resetOtp = null;
-            user.resetOtpExpiresAt = null;
-            await user.save();
-
-            return res.status(200).json({
-                success: true,
-                message: "Password reset successfully. You can now log in.",
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "No account found with this email."
             });
         }
-        catch (error) {
+        if (user.resetOtp !== otp) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid OTP."
+
+            });
+        }
+        if (Date.now() > new Date(user.resetOtpExpiresAt)) {
+            return res.status(400).json({
+                success: false,
+                message: "OTP has expired. Please request a new one."
+            });
+
+        }
+        if (!passwordRegex.test(newPassword)) {
+            return res.status(400).json({
+                success: false,
+                message: "Password must be at least 8 characters and contain an uppercase letter, a number, and a special character.",
+            });
+        }
+        user.password = await bcrypt.hash(newPassword, 10);
+        user.resetOtp = null;
+        user.resetOtpExpiresAt = null;
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Password reset successfully. You can now log in.",
+        });
+    }
+    catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
 
-    }
+}
 
 
 
