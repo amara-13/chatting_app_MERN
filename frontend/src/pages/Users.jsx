@@ -36,13 +36,10 @@ function Users(){
 
 
 
+    
 
 
-
-
-console.log(allUsers);
-
-    return(
+return(
         
 <AllUsers allUsers={allUsers}/>
 

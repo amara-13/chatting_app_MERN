@@ -1,30 +1,44 @@
 import { useEffect, useState, useRef } from "react";
 import Chat from "../components/Chat";
 import Swal from "sweetalert2";
-import { fetchUsers, sendMessageApi, fetchMessagesApi } from "../services/ChatService";
+import { fetchUsers, sendMessageApi, fetchMessagesApi, sendVoiceApi } from "../services/ChatService";
 import { socket } from "../socket";
 
 function ChatUser() {
     //   login user info
-     const userString = localStorage.getItem("user");
+    const userString = localStorage.getItem("user");
     const userId = userString ? JSON.parse(userString).id : null;
     const userEmail = userString ? JSON.parse(userString).email : null;
-  
+
     // component states
 
     const [user, setUser] = useState([]);
     const [receiverId, setReceiverId] = useState(null);
     const [messages, setMessages] = useState([]);
-    const [unreadMessages,setUnreadMessage] = useState({});
+    const [unreadMessages, setUnreadMessage] = useState({});
     const [connectedUser, setConnectedUser] = useState([]);
     const [isTyping, setIsTyping] = useState(null);
     const [sendMessage, setSendMessage] = useState({
         content: ""
     });
+    const [recording, setRecording] = useState(false);
+    const [audioURL, setAudioURL] = useState(null);
+    const [sending, setSending] = useState(false);
+    const sendingRef = useRef(false);
+
+
 
     // Refs
-     const typingRef = useRef(null);
+    const typingRef = useRef(null);
     const activeReceiverRef = useRef(null);
+
+    const mediaRecorderRef = useRef(null);
+    const audioChunkRef = useRef([]);
+    const streamRef = useRef(null);
+    const audioBlobRef = useRef(null);
+
+
+
 
 
     // Fetch all user list
@@ -58,7 +72,7 @@ function ChatUser() {
         }
     };
 
-     // Keep activeReceiverRef in sync with receiverId
+    // Keep activeReceiverRef in sync with receiverId
     useEffect(() => {
         activeReceiverRef.current = receiverId;
     }, [receiverId]);
@@ -79,7 +93,7 @@ function ChatUser() {
         socket.on('connect', registerUser);
 
         socket.on("user-online", (newUserId) => {
-            setConnectedUser(prev => [...prev, newUserId]);
+            setConnectedUser(prev => prev.includes(newUserId) ? prev : [...prev, newUserId]);
         });
 
         socket.on("get-online-users", (userIds) => {
@@ -150,7 +164,7 @@ function ChatUser() {
             return updated;
         });
     }, [receiverId, userId]);
-   
+
     // Typing handler
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -185,12 +199,38 @@ function ChatUser() {
         }, 3000);
     };
 
-    
+
     // Send message submit handler
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (sendingRef.current)
+            return;
+        const sendToMessage = sendMessage.content.trim();
+        if (!sendToMessage && !audioBlobRef.current)
+            return;
 
-        if (!sendMessage.content.trim()) return;
+        if (audioBlobRef.current) {
+            await handleSendVoice();
+            return;
+        }
+        if (!userId) {
+            console.log("User is not logged in");
+            return;
+        }
+        sendingRef.current = true;
+        setSending(true);
+
+        setSendMessage({ content: "" });
+        const tempId = `tempI-${Date.now()}`;
+        const tempMessage = {
+            _id: tempId,
+            sender: userId,
+            receiver: receiverId,
+            message: sendToMessage,
+            createdAt: new Date().toISOString(),
+            isPending: true,
+        };
+        setMessages(prev => [...prev, tempMessage]);
 
         clearTimeout(typingRef.current);
         socket.emit("stopTyping", {
@@ -198,15 +238,12 @@ function ChatUser() {
             receiver: receiverId
         });
 
-        if (!userId) {
-            console.log("User is not logged in");
-            return;
-        }
-
         try {
+
             const messageData = {
                 email: userEmail,
-                content: sendMessage.content,
+                // content: sendMessage.content,
+                content: sendToMessage,
                 receiver: receiverId
             };
 
@@ -216,7 +253,10 @@ function ChatUser() {
                 socket.emit('send-private-message', response.data);
 
                 // Add to local message list
-                setMessages(prev => [...prev, response.data]);
+                // setMessages(prev => [...prev, response.data]);
+                setMessages((prev) => prev.map((msg) => (msg._id === tempId ? response.data : msg))
+                );
+
                 setSendMessage({ content: "" });
             } else {
                 Swal.fire({
@@ -230,11 +270,93 @@ function ChatUser() {
                 title: "Failed",
                 text: errorMsg,
             });
+        } finally {
+            sendingRef.current = false;
+            setSending(false);
+
         }
     };
-   
+    //    start recording voice message 
 
-    
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            streamRef.current = stream;
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunkRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0)
+                    audioChunkRef.current.push(event.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(
+                    audioChunkRef.current,
+                    { type: "audio/webm" }
+                );
+                audioBlobRef.current = audioBlob;
+                const url = URL.createObjectURL(audioBlob);
+                setAudioURL(url);
+
+                streamRef.current.getTracks().forEach((track) => {
+                    track.stop();
+                });
+            };
+
+            mediaRecorder.start();
+            setRecording(true);
+        } catch (error) {
+            console.error("Error accessing microphone:", error);
+
+        }
+    };
+    const stopRecording = () => {
+        mediaRecorderRef.current.stop();
+        setRecording(false);
+    };
+
+    const handleSendVoice = async () => {
+          if (sendingRef.current) return;
+        if (!audioBlobRef.current || !receiverId || !userEmail) {
+            return;
+        }
+         sendingRef.current = true;
+        setSending(true);
+        const formData = new FormData();
+        formData.append(
+            "voiceMessage",
+            audioBlobRef.current,
+            `voice-${Date.now()}.webm`
+        );
+        formData.append("sender", userEmail);
+        formData.append("receiver", receiverId);
+
+        try {
+            const response = await sendVoiceApi(formData);
+            if (response && response.data) {
+                socket.emit('send-private-message', response.data);
+                setMessages(prev => [...prev, response.data]);
+                setAudioURL(null);
+                audioBlobRef.current = null;
+            }
+        } catch (error) {
+
+        }
+        finally {
+            // 4. Release lock and re-enable button when upload finishes
+            sendingRef.current = false;
+            setSending(false);
+        }
+    }
+    // voice cancel
+    const cancelVoice = () => {
+        setAudioURL(null);
+        audioBlobRef.current = null;
+        setRecording(null);
+    };
+
     return (
         <Chat
             users={user}
@@ -246,7 +368,13 @@ function ChatUser() {
             messages={messages}
             currentUser={userId}
             isTyping={isTyping}
-            unreadMessages = {unreadMessages}
+            unreadMessages={unreadMessages}
+            recording={recording}
+            startRecording={startRecording}
+            stopRecording={stopRecording}
+            audioURL={audioURL}
+            cancelVoice={cancelVoice}
+            sending={sending}
         />
     );
 }

@@ -10,7 +10,13 @@ function Chat({
   messages = [],
   currentUser,
   isTyping,
-  unreadMessages = {}
+  unreadMessages = {},
+  recording,
+  startRecording,
+  stopRecording,
+  audioURL,
+  cancelVoice,
+  sending
 }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -237,9 +243,13 @@ function Chat({
                         <div className="max-w-[70%]">
 
                           <div className="bg-indigo-500 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm">
-                            <p className="text-sm text-white">
-                              {message.message || message.content}
-                            </p>
+                            {message.messageType === "voice" || message.audioUrl || message.audioUrl ? (
+                              <audio controls src={message.audioURL || message.audioUrl} />
+                            ) : (
+                              <p className="text-sm text-white">
+                                {message.message || message.content}
+                              </p>
+                            )}
                           </div>
                           {isLastInGroup && currentTime && (
                             <p className="text-xs text-gray-400 mt-1 ml-1">
@@ -257,9 +267,12 @@ function Chat({
                         <div className="max-w-[70%]">
 
                           <div className="bg-gray-600 text-black px-4 py-3 rounded-2xl rounded-tr-none shadow-sm">
-                            <p className="text-sm text-white">
-                              {message.message || message.content}
-                            </p>
+                            {message.messageType === "voice" || message.audioUrl || message.audioURL ? (
+                              <audio controls src={message.audioURL || message.audioUrl} />
+                            ) : (
+                              <p className="text-sm text-white">
+                                {message.message || message.content}
+                              </p>)}
                           </div>
 
                           {isLastInGroup && currentTime && (
@@ -289,7 +302,7 @@ function Chat({
               <div >
                 <form onSubmit={handleSubmit} className="h-16 bg-white border-t border-gray-200 px-4 flex items-center gap-3" >
                   {/* Attachment */}
-                  <button
+                  <button type="button"
                     className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 text-xl"
                     title="Attach file"
                   >
@@ -307,7 +320,7 @@ function Chat({
                     />
 
                     {/* Emoji */}
-                    <button
+                    <button type="button"
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-lg text-gray-500 hover:text-gray-700"
                       title="Emoji"
                     >
@@ -318,20 +331,42 @@ function Chat({
 
 
                   {/* Voice */}
-                  <button
+                  <button onClick={recording ? stopRecording : startRecording}
+                    type="button"
                     className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 text-xl"
                     title="Voice message"
                   >
-                    🎤
+                    {recording ? "🛑" : "🎙️"}
                   </button>
+                  {/* {audioURL && (
+                    <div>
+                      <audio controls src={audioURL} />
+                    </div>
+                  )} */}
 
+                  {audioURL && (
+                    <div className="flex items-center gap-2">
+                      <audio controls src={audioURL} className="h-8" />
+                      <button
+                        type="button"
+                        onClick={cancelVoice}
+                        className="text-red-500 hover:text-red-700 text-sm font-semibold"
+                        title="Delete recording"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
 
                   {/* Send */}
-                  <button type="submit " disabled={!sendMessage.content?.trim()}
+                  <button type="submit"
+                    disabled={!sendMessage.content?.trim() && !audioURL || sending}
+
                     className="w-10 h-10 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white flex items-center justify-center text-lg transition"
                     title="Send message"
                   >
-                    ➤
+                    {!sendMessage.content?.trim() && !audioURL || sending?"":"➤"}
+                 
                   </button>
                 </form>
 

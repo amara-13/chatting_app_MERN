@@ -1,5 +1,8 @@
 const Users = require("../models/User");
 const Messages = require("../models/Messages");
+const Cloudinary = require("../config/cloudinary");
+
+
 
 //fetch all users
 const fetchUsers = async (req, res) => {
@@ -80,9 +83,107 @@ const getMessages = async (req, res) => {
     }
 };
 
+
+
+// send Friend request
+// const sendFriendRequest  = async(req,res)=>{
+//     try{
+//         const{receiver,sender} = req.body;
+//         if(!receiver && !sender){
+//             return res.status(400).json({
+//                 status:false,
+//                 message:"receiver  and id required"
+//             });
+            
+//         }
+//         if(sender===sender){
+//           return res.status(400).json({
+//                 status:false,
+//                 message:"don't send friend request to yourself"
+//             });  
+//         }
+//         if()
+//     }catch(error){
+
+//     }
+// }
+// const storage = multer.diskStorage({
+//     destination:(req,file,cb)=>{
+//         cb(null,"upload/voice");
+//     },
+//     filename:(req,file,cb)=>{
+//         cb(null,`${Date.now()-${file.originalname}`);
+//     }
+// });
+// const upload = multer({storage})
+ const voiceMessage = async(req,res)=>{
+     try{
+        console.log("File",req.file);
+        console.log("Receiver",req.body.receiver);
+
+        const{sender,receiver} = req.body;
+        const file = req.file;
+        if(!sender){
+            return res.status(422).json({
+                status:false,
+                success:"sender required"
+            });
+        }
+        if(!receiver){
+            return response.status(422).json({
+                status:false,
+                success:"receiver required"
+            });
+        } 
+        if(!file){
+            return response.status(422).json({
+                status:false,
+                success:"voice message is  required"
+            });
+        }
+        const user = await Users.findOne({email:sender.toLowerCase().trim()});
+        if(!user){
+            return response.status(401).json({
+                success:false,
+                message:"sender is not authenticated"
+            });
+        }
+
+        const result = await  Cloudinary.uploader.upload(req.file.path,{
+            resource_type: "video"
+        });
+       console.log("cloudinary url",result.secure_url);
+       
+       const newMessage = await  Messages.create({
+        sender:user._id,
+        receiver:req.body.receiver,
+        messageType:"voice",
+        audioUrl:result.secure_url,
+         message: "Voice message"
+       });
+
+        return res.status(200).json({
+         success:true,
+         message:"voice message received",
+        //  file:req.file
+        data:newMessage,
+        });
+
+     }
+     
+     catch(error){
+        console.error(error);
+        return res.status(500).json({
+            success:false,
+            message:"voice message upload failed"
+        });
+     }
+ }
 module.exports = {
     fetchUsers,
     saveMessage,
-    getMessages
+    getMessages,
+    // sendFriendRequest,
+    voiceMessage
 };
 

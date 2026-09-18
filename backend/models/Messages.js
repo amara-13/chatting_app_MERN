@@ -16,11 +16,20 @@ const  messageSchema = new mongoose.Schema(
         },
         message:{
             type:String,
-            required:true,
+            required:false,
         },
         isRead:{
             type:Boolean,
             default:false
+        },
+        messageType:{
+            type:String,
+            enum:["text","voice"],
+            default:"text",
+        },
+        audioUrl:{
+            type:String,
+            default:null,
         },
     },
     {
