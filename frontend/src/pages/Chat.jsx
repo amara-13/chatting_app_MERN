@@ -354,7 +354,7 @@ function ChatUser() {
     const cancelVoice = () => {
         setAudioURL(null);
         audioBlobRef.current = null;
-        setRecording(null);
+        setRecording(false);
     };
 
     return (

@@ -244,7 +244,7 @@ const resetOtp = async (req, res) => {
             })
         }
         const resetOtp = Math.floor(100000 + Math.random() * 900000).toString();
-        const otpExpiresAt = new Date(Date.now() + 10 * 60 * 10000);
+        const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
         user.resetOtp = resetOtp;
         user.resetOtpExpiresAt = otpExpiresAt;
