@@ -24,4 +24,7 @@ export const sendVoiceApi = async(formData)=>{
     const response = await axios.post(`${url}/voicemessage`,formData);
     return response.data;
 };
-
+export const sendAttachmentApi = async(formData)=>{
+    const response = await axios.post(`${url}/fileattachment`,formData);
+    return response.data;
+};

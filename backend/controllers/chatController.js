@@ -130,20 +130,20 @@ const getMessages = async (req, res) => {
             });
         }
         if(!receiver){
-            return response.status(422).json({
+            return res.status(422).json({
                 status:false,
                 success:"receiver required"
             });
         } 
         if(!file){
-            return response.status(422).json({
+            return res.status(422).json({
                 status:false,
                 success:"voice message is  required"
             });
         }
         const user = await Users.findOne({email:sender.toLowerCase().trim()});
         if(!user){
-            return response.status(401).json({
+            return res.status(401).json({
                 success:false,
                 message:"sender is not authenticated"
             });
@@ -179,11 +179,71 @@ const getMessages = async (req, res) => {
         });
      }
  }
+ 
+//send file Attachment
+const fileAttachment = async(req,res)=>{
+    try{
+    const{sender,receiver} = req.body;
+    const file = req.file;
+        if(!sender){
+            return res.status(422).json({
+                status:false,
+                success:"sender required"
+            });
+        }
+        if(!receiver){
+            return res.status(422).json({
+                status:false,
+                success:"receiver required"
+            });
+        } 
+        if(!file){
+            return res.status(422).json({
+                status:false,
+                success:"voice message is  required"
+            });
+        }
+         const user = await Users.findOne({email:sender.toLowerCase().trim()});
+        if(!user){
+            return res.status(401).json({
+                success:false,
+                message:"sender is not authenticated"
+            });
+        }
+        
+        const result = await Cloudinary.uploader.upload(req.file.path,{
+            resource_type:"auto"
+        });
+       
+        newFile = await  Messages.create({
+            sender:user._id,
+            receiver:receiver,
+            message:req.file.originalname,
+            messageType:"file",
+            fileUrl:result.secure_url,
+            fileName:req.file.originalname,
+            fileType:req.file.mimetype,
+        });
+         return res.status(200).json({
+         success:true,
+         message:"voice message received",
+        data:newFile,
+        });
+    }catch(error){
+        console.error(error);
+         return res.status(500).json({
+            success: false,
+            message: "Attachment upload failed"
+        });
+    }
+    
+}
 module.exports = {
     fetchUsers,
     saveMessage,
     getMessages,
     // sendFriendRequest,
-    voiceMessage
+    voiceMessage,
+    fileAttachment
 };
 

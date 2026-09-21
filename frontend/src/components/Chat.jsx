@@ -16,7 +16,13 @@ function Chat({
   stopRecording,
   audioURL,
   cancelVoice,
-  sending
+  sending,
+  handleAttachmentClick,
+  fileInputRef,
+  handleFileChange,
+  selectedFile,
+  handleSendAttachment,
+  cancelAttachment,
 }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -243,9 +249,42 @@ function Chat({
                         <div className="max-w-[70%]">
 
                           <div className="bg-indigo-500 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm">
-                            {message.messageType === "voice" || message.audioUrl || message.audioUrl ? (
+                            {message.messageType === "voice" || message.audioUrl ? (
                               <audio controls src={message.audioURL || message.audioUrl} />
-                            ) : (
+                            ) : message.messageType === "file" || message.fileUrl ? (
+                              message.fileType?.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp)$/i.test(message.fileUrl)
+                                ? (
+                                  <a href={message.fileUrl} target="_blank" rel="noopener noreferrer">
+                                    <img
+                                      src={message.fileUrl}
+                                      alt={message.fileName || "Image"}
+                                      className="max-w-xs max-h-60 rounded-lg object-cover cursor-pointer hover:opacity-95"
+                                    /></a>
+                                ) : (
+                                  <div className="flex items-center gap-3  p-1 rounded-xl transition cursor-pointer max-w-xs">
+                                    {/* File Icon */}
+                                    <a
+                                      href={message.fileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-3  bg-black-500/20 hover:bg-black/20 py-2 rounded-xl transition cursor-pointer max-w-xs block no-underline"
+                                      title="Click to open file in new tab"
+                                    >
+                                      <div className="w-10 h-10 rounded-lg bg-blue-400 text-red-500 flex items-center justify-center text-xl font-bold">
+                                        {message.fileName?.endsWith(".pdf") ? "📄" : "📁"}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-white truncate">
+                                          {message.fileName || message.message || "Document"}
+                                        </p>
+                                        <span className="text-xs text-white/70 uppercase">
+                                          {message.fileName ? message.fileName.split('.').pop() : "FILE"}
+                                        </span>
+                                      </div>
+                                    </a>
+                                  </div>
+
+                                )) : (
                               <p className="text-sm text-white">
                                 {message.message || message.content}
                               </p>
@@ -266,13 +305,62 @@ function Chat({
                       <div className="flex justify-start" key={message._id || index}>
                         <div className="max-w-[70%]">
 
-                          <div className="bg-gray-600 text-black px-4 py-3 rounded-2xl rounded-tr-none shadow-sm">
+                          {/* <div className="bg-gray-600 text-black px-4 py-3 rounded-2xl rounded-tr-none shadow-sm">
                             {message.messageType === "voice" || message.audioUrl || message.audioURL ? (
                               <audio controls src={message.audioURL || message.audioUrl} />
-                            ) : (
+                            ) :message.messageType==="file"?(
+                               <img
+                                src={message.fileURL}
+                                alt={message.fileName}
+                                className="max-w-xs rounded-lg"
+                            />
+                            ):
+                             (
                               <p className="text-sm text-white">
                                 {message.message || message.content}
                               </p>)}
+                          </div> */}
+                          <div className="bg-gray-600 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm">
+                            {message.messageType === "voice" || message.audioUrl ? (
+                              <audio controls src={message.audioURL || message.audioUrl} />
+                            ) : message.messageType === "file" || message.fileUrl ? (
+                              message.fileType?.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp)$/i.test(message.fileUrl)
+                                ? (
+                                  <a href={message.fileUrl} target="_blank" rel="noopener noreferrer">
+                                    <img
+                                      src={message.fileUrl}
+                                      alt={message.fileName || "Image"}
+                                      className="max-w-xs max-h-60 rounded-lg object-cover cursor-pointer hover:opacity-95"
+                                    /></a>
+                                ) : (
+                                  <div className="flex items-center gap-3  p-1 rounded-xl transition cursor-pointer max-w-xs">
+                                    {/* File Icon */}
+                                    <a
+                                      href={message.fileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-3  bg-black-500/20 hover:bg-black/20 py-2 rounded-xl transition cursor-pointer max-w-xs block no-underline"
+                                      title="Click to open file in new tab"
+                                    >
+                                      <div className="w-10 h-10 rounded-lg bg-blue-400 text-red-500 flex items-center justify-center text-xl font-bold">
+                                        {message.fileName?.endsWith(".pdf") ? "📄" : "📁"}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-white truncate">
+                                          {message.fileName || message.message || "Document"}
+                                        </p>
+                                        <span className="text-xs text-white/70 uppercase">
+                                          {message.fileName ? message.fileName.split('.').pop() : "FILE"}
+                                        </span>
+                                      </div>
+                                    </a>
+                                  </div>
+
+                                )) : (
+                              <p className="text-sm text-white">
+                                {message.message || message.content}
+                              </p>
+                            )}
                           </div>
 
                           {isLastInGroup && currentTime && (
@@ -289,6 +377,14 @@ function Chat({
 
                   )
                 })}
+                {selectedFile && (
+                  <div className="px-4 py-2 bg-indigo-50 border-t border-indigo-100 flex items-center justify-between">
+                    <p>{selectedFile.name}</p>
+                    <button type="button" onClick={cancelAttachment} className="cursor-pointer">✕</button>
+                  </div>
+                )}
+
+
                 {isTyping === selectedUser._id && (
                   <span className="italic text-gray-500 text-xs">
                     {selectedUser.name} is typing...
@@ -302,13 +398,9 @@ function Chat({
               <div >
                 <form onSubmit={handleSubmit} className="h-16 bg-white border-t border-gray-200 px-4 flex items-center gap-3" >
                   {/* Attachment */}
-                  <button type="button"
-                    className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 text-xl"
-                    title="Attach file"
-                  >
-                    📎
-                  </button>
-
+                  <input type="file" id="file-upload" ref={fileInputRef} onChange={handleFileChange} className="hidden" title="Attach file" />
+                  <button type="button" onClick={handleAttachmentClick} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 text-xl"
+                    title="Attach file">📎</button>
 
                   {/* Message Input */}
                   <div className="flex-1 relative">
@@ -360,13 +452,13 @@ function Chat({
 
                   {/* Send */}
                   <button type="submit"
-                    disabled={!sendMessage.content?.trim() && !audioURL || sending}
+                    disabled={!sendMessage.content?.trim() && !audioURL && !selectedFile || sending}
 
                     className="w-10 h-10 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white flex items-center justify-center text-lg transition"
                     title="Send message"
                   >
-                    {!sendMessage.content?.trim() && !audioURL || sending?"":"➤"}
-                 
+                    {!sendMessage.content?.trim() && !audioURL && !selectedFile || sending ? "" : "➤"}
+
                   </button>
                 </form>
 

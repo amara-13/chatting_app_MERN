@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import Chat from "../components/Chat";
 import Swal from "sweetalert2";
-import { fetchUsers, sendMessageApi, fetchMessagesApi, sendVoiceApi } from "../services/ChatService";
+import { fetchUsers, sendMessageApi, fetchMessagesApi, sendVoiceApi,sendAttachmentApi } from "../services/ChatService";
 import { socket } from "../socket";
 
 function ChatUser() {
@@ -24,8 +24,7 @@ function ChatUser() {
     const [recording, setRecording] = useState(false);
     const [audioURL, setAudioURL] = useState(null);
     const [sending, setSending] = useState(false);
-    const sendingRef = useRef(false);
-
+    const[selectedFile,setSelectedFile] = useState(null);
 
 
     // Refs
@@ -36,6 +35,10 @@ function ChatUser() {
     const audioChunkRef = useRef([]);
     const streamRef = useRef(null);
     const audioBlobRef = useRef(null);
+    const sendingRef = useRef(false);
+    const fileInputRef = useRef(null);
+    
+
 
 
 
@@ -206,11 +209,15 @@ function ChatUser() {
         if (sendingRef.current)
             return;
         const sendToMessage = sendMessage.content.trim();
-        if (!sendToMessage && !audioBlobRef.current)
+        if (!sendToMessage && !audioBlobRef.current && !selectedFile)
             return;
 
         if (audioBlobRef.current) {
             await handleSendVoice();
+            return;
+        }
+        if(selectedFile){
+            await handleSendAttachment();
             return;
         }
         if (!userId) {
@@ -357,6 +364,59 @@ function ChatUser() {
         setRecording(false);
     };
 
+    const handleAttachmentClick = ()=>{
+        fileInputRef.current.click();
+    }
+    const handleFileChange = (e)=>{
+        const file = e.target.files[0];
+        if(!file)
+            return 
+        console.log("selected file:",file);
+        setSelectedFile(file);
+   }
+   const handleSendAttachment = async()=>{
+    if(sendingRef.current) return 
+    if(!selectedFile ||!receiverId || !userEmail)
+    {return}
+   
+if(sending) return;
+   sendingRef.current = true;
+    setSending(true);
+try{
+ 
+    const formData = new FormData();
+    formData.append("receiver",receiverId);
+    formData.append("sender",userEmail);
+    formData.append("file",selectedFile);
+    console.log("Sending attachment:", selectedFile);
+
+    const response = await sendAttachmentApi(formData);
+    if(response && response.data){
+        console.log("Attachment file",response.data);
+        socket.emit("send-private-message",response.data);
+        setMessages(prev=>[...prev,response.data]);
+        setSelectedFile(null);
+        if(fileInputRef.current){
+            fileInputRef.current.value = "";
+        }
+    }
+  
+}catch(error){
+    console.log(error);
+}finally{
+    setSending(false);
+    sendingRef.current = false;
+}
+}
+  const cancelAttachment = ()=>{
+        setSelectedFile(null);
+        if(fileInputRef.current){
+            fileInputRef.current.value = "";
+        }
+    };
+    
+
+
     return (
         <Chat
             users={user}
@@ -375,6 +435,13 @@ function ChatUser() {
             audioURL={audioURL}
             cancelVoice={cancelVoice}
             sending={sending}
+            handleAttachmentClick={handleAttachmentClick}
+            fileInputRef={fileInputRef}
+            handleFileChange={handleFileChange}
+            selectedFile={selectedFile}
+            handleSendAttachment= {handleSendAttachment}
+            cancelAttachment={cancelAttachment}
+            setSelectedFile={setSelectedFile}
         />
     );
 }
