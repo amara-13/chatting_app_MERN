@@ -57,7 +57,7 @@ io.on('connection', (socket) => {
 
         // Tell all connected clients that this user is online
         socket.broadcast.emit("user-online", userId);
-        socket.emit("get-online-users",Object.keys(onlineUser));
+        socket.emit("get-online-users", Object.keys(onlineUser));
     });
 
     socket.on('send-private-message', (messageData) => {
@@ -68,23 +68,97 @@ io.on('connection', (socket) => {
             io.to(receiverId).emit('receive-private-message', messageData);
         }
     });
-// typing indicator
-socket.on('typing',(data)=>{
-    const {sender,receiver} = data;
-    const receiverSocket = onlineUser[receiver];
-    if(receiverSocket){
-    io.to(receiverSocket).emit("typingIndicator",sender);
-    }}
-);
-socket.on("stopTyping",(data)=>{
-    const {sender,receiver} = data;
-    const receiverSocket = onlineUser[receiver];
-    console.log("receiver typer",receiverSocket);
-    if(receiverSocket){
-    io.to(receiverSocket).emit("stopTypingIndicator",sender);
+    // typing indicator
+    socket.on('typing', (data) => {
+        const { sender, receiver } = data;
+        const receiverSocket = onlineUser[receiver];
+        if (receiverSocket) {
+            io.to(receiverSocket).emit("typingIndicator", sender);
+        }
     }
-})
+    );
+    socket.on("stopTyping", (data) => {
+        const { sender, receiver } = data;
+        const receiverSocket = onlineUser[receiver];
+        console.log("receiver typer", receiverSocket);
+        if (receiverSocket) {
+            io.to(receiverSocket).emit("stopTypingIndicator", sender);
+        }
+    })
 
+    // voice call
+    socket.on('call-user', (data) => {
+        const { callerId, receiverId, callType, offer } = data;
+        const receiverSocketId = onlineUser[receiverId];
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit("incoming-call", {
+                callerId,
+                receiverId,
+                callType,
+                offer
+            });
+        } else {
+            console.log("Receiver is offline")
+        }
+    });
+    // reject the call[]
+    socket.on("reject-call", (data) => {
+        const { callerId, receiverId } = data;
+        const callerSocketId = onlineUser[callerId];
+        if (callerSocketId) {
+            io.to(callerSocketId).emit("call-rejected");
+        }
+    });
+    //accept callll
+    socket.on("accept-call", (data) => {
+        const { callerId, receiverId, answer } = data;
+        const callerSocketId = onlineUser[callerId];
+        if (callerSocketId) {
+            io.to(callerSocketId).emit("call-accepted", {
+                receiverId, answer
+            }
+            );
+        }
+        console.log("call receive", data);
+    });
+
+    // create ice-candidate
+    socket.on("ice-candidate", (data) => {
+        const { receiverId, candidate } = data;
+        const receiverSocketId = onlineUser[receiverId];
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit("ice-candidate", {
+                candidate
+            });
+        }
+    });
+    // call end
+    socket.on("call-end", (data) => {
+        const { callerId, receiverId } = data;
+        const receiversocketId = onlineUser[receiverId];
+        if (receiversocketId) {
+            io.to(receiversocketId).emit("call-ended");
+        }
+    });
+
+
+
+
+
+
+
+
+
+
+    // socket.on("ice-candidate",(data)=>{
+    //     const{receiverId,candidate} = data;
+    //     const receiverSocketId = onlineUser[receiverId];
+    //     if(receiverSocketId){
+    //         io.to(receiverSocketId).emit("ice-candidate",{
+    //         candidate
+    //         });
+    //     }
+    // });
 
     // disconnect
     socket.on('disconnect', (reason) => {

@@ -1,8 +1,20 @@
 import { useEffect, useState, useRef } from "react";
 import Chat from "../components/Chat";
 import Swal from "sweetalert2";
-import { fetchUsers, sendMessageApi, fetchMessagesApi, sendVoiceApi,sendAttachmentApi } from "../services/ChatService";
+import { fetchUsers, sendMessageApi, fetchMessagesApi, sendVoiceApi, sendAttachmentApi } from "../services/ChatService";
 import { socket } from "../socket";
+
+const Toast = Swal.mixin({
+    toast: true,
+    position: "top-end",
+    showConfirmButton: false,
+    timer: 3000,
+    timerProgressBar: true,
+    didOpen: (toast) => {
+        toast.onmouseenter = Swal.stopTimer;
+        toast.onmouseleave = Swal.resumeTimer;
+    },
+});
 
 function ChatUser() {
     //   login user info
@@ -24,8 +36,12 @@ function ChatUser() {
     const [recording, setRecording] = useState(false);
     const [audioURL, setAudioURL] = useState(null);
     const [sending, setSending] = useState(false);
-    const[selectedFile,setSelectedFile] = useState(null);
-
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [incomingCall, setIncomingCall] = useState(null);
+    const [callStatus, setCallStatus] = useState("idle");
+    const [isMuted, setIsMuted] = useState(false);
+    const [callDuration, setCallDuration] = useState(0);
+    const [activeCallPartnerId, setActiveCallPartner] = useState(null);
 
     // Refs
     const typingRef = useRef(null);
@@ -37,7 +53,10 @@ function ChatUser() {
     const audioBlobRef = useRef(null);
     const sendingRef = useRef(false);
     const fileInputRef = useRef(null);
-    
+    const peerConnectionRef = useRef(null);
+    const localStreamRef = useRef(null);
+    const remoteStreamRef = useRef(null);
+    const remoteAudioRef = useRef(null);
 
 
 
@@ -216,7 +235,7 @@ function ChatUser() {
             await handleSendVoice();
             return;
         }
-        if(selectedFile){
+        if (selectedFile) {
             await handleSendAttachment();
             return;
         }
@@ -325,11 +344,11 @@ function ChatUser() {
     };
 
     const handleSendVoice = async () => {
-          if (sendingRef.current) return;
+        if (sendingRef.current) return;
         if (!audioBlobRef.current || !receiverId || !userEmail) {
             return;
         }
-         sendingRef.current = true;
+        sendingRef.current = true;
         setSending(true);
         const formData = new FormData();
         formData.append(
@@ -364,57 +383,376 @@ function ChatUser() {
         setRecording(false);
     };
 
-    const handleAttachmentClick = ()=>{
+    const handleAttachmentClick = () => {
         fileInputRef.current.click();
     }
-    const handleFileChange = (e)=>{
+    const handleFileChange = (e) => {
         const file = e.target.files[0];
-        if(!file)
-            return 
-        console.log("selected file:",file);
+        if (!file)
+            return
+        console.log("selected file:", file);
         setSelectedFile(file);
-   }
-   const handleSendAttachment = async()=>{
-    if(sendingRef.current) return 
-    if(!selectedFile ||!receiverId || !userEmail)
-    {return}
-   
-if(sending) return;
-   sendingRef.current = true;
-    setSending(true);
-try{
- 
-    const formData = new FormData();
-    formData.append("receiver",receiverId);
-    formData.append("sender",userEmail);
-    formData.append("file",selectedFile);
-    console.log("Sending attachment:", selectedFile);
+    }
+    const handleSendAttachment = async () => {
+        if (sendingRef.current) return
+        if (!selectedFile || !receiverId || !userEmail) { return }
 
-    const response = await sendAttachmentApi(formData);
-    if(response && response.data){
-        console.log("Attachment file",response.data);
-        socket.emit("send-private-message",response.data);
-        setMessages(prev=>[...prev,response.data]);
-        setSelectedFile(null);
-        if(fileInputRef.current){
-            fileInputRef.current.value = "";
+        if (sending) return;
+        sendingRef.current = true;
+        setSending(true);
+        try {
+
+            const formData = new FormData();
+            formData.append("receiver", receiverId);
+            formData.append("sender", userEmail);
+            formData.append("file", selectedFile);
+            console.log("Sending attachment:", selectedFile);
+
+            const response = await sendAttachmentApi(formData);
+            if (response && response.data) {
+                console.log("Attachment file", response.data);
+                socket.emit("send-private-message", response.data);
+                setMessages(prev => [...prev, response.data]);
+                setSelectedFile(null);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                }
+            }
+
+        } catch (error) {
+            console.log(error);
+        } finally {
+            setSending(false);
+            sendingRef.current = false;
         }
     }
-  
-}catch(error){
-    console.log(error);
-}finally{
-    setSending(false);
-    sendingRef.current = false;
-}
-}
-  const cancelAttachment = ()=>{
+    const cancelAttachment = () => {
         setSelectedFile(null);
-        if(fileInputRef.current){
+        if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
     };
-    
+
+    // ******voice call*****
+    const handleStartCall = async () => {
+        if (!userId || !receiverId) { return };
+        console.log("starting call ....");
+        setCallStatus("calling");
+        setActiveCallPartner(receiverId);
+        const peerConnection = createPeerConnection(receiverId);
+        console.log("Peer connection:", peerConnection);
+        const stream = await getLocalStream();
+        if (!stream) {
+            console.log("microphone stream not available");
+        }
+
+        addLocalTrack(peerConnection, stream);
+        const offer = await createOffer(peerConnection);
+        console.log("Offer Ready", offer);
+
+
+
+        socket.emit("call-user", {
+            callerId: userId,
+            receiverId: receiverId,
+            callType: "audio",
+            offer: offer,
+        });
+        console.log("call user ", userId, receiverId);
+    }
+
+    useEffect(() => {
+        const handleIncomingCall = (callData) => {
+            setIncomingCall(callData);
+            console.log("incoming call data", callData);
+            console.log(setIncomingCall);
+            setCallStatus("ringing");
+        };
+
+        socket.on("incoming-call", handleIncomingCall);
+
+        return () => {
+            socket.off("incoming-call", handleIncomingCall);
+        }
+    }, []);
+
+    const handleAcceptCall = async () => {
+        if (!incomingCall) return;
+        console.log("call accepted");
+        setCallStatus("connected");
+        setActiveCallPartner(incomingCall.callerId);
+
+        const peerConnection = createPeerConnection(incomingCall.callerId);
+        console.log("peer connection:", peerConnection);
+
+        const stream = await getLocalStream();
+        if (!stream) return;
+        console.log("stream created", stream);
+        await addLocalTrack(peerConnection, stream);
+        console.log(" addlocaltrack");
+        await peerConnection.setRemoteDescription(incomingCall.offer);
+        console.log("Remote offer set");
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        console.log("Answer created:", answer);
+        socket.emit("accept-call", {
+            callerId: incomingCall.callerId,
+            receiverId: userId,
+            answer: answer
+        });
+        setIncomingCall(null);
+    };
+
+    const handleRejectCall = () => {
+        console.log("rejected");
+        if (!incomingCall) {
+            return;
+        }
+
+        socket.emit("reject-call", {
+            callerId: incomingCall.callerId,
+            receiverId: userId,
+        });
+        setIncomingCall(null);
+        setCallStatus("idle");
+    };
+
+    useEffect(() => {
+        const handleCallRejected = () => {
+            console.log("call rejected ");
+            setCallStatus("idle");
+            Toast.fire({
+                icon: "error",
+                title: "Call Declined",
+                text: "User declined your call",
+            });
+
+            if (peerConnectionRef.current) {
+                peerConnectionRef.current.close();
+                peerConnectionRef.current = null;
+            }
+        };
+
+        socket.on("call-rejected", handleCallRejected);
+
+        return () => {
+            socket.off("call-rejected", handleCallRejected);
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleCallAccepted = async (data) => {
+            console.log("call accepted");
+            const peerConnection = peerConnectionRef.current;
+            if (!peerConnection) {
+                console.log("peer connection not");
+                return;
+            }
+            await peerConnection.setRemoteDescription(data.answer);
+            setCallStatus("connected");
+            console.log("Remote answer set");
+        };
+        socket.on("call-accepted", handleCallAccepted);
+
+        return () => {
+            socket.off("call-accepted", handleCallAccepted);
+        };
+    }, []);
+
+    //create peer connection
+    const createPeerConnection = (otherUserId) => {
+        const peerConnection = new RTCPeerConnection({
+            iceServers: [
+                {
+                    urls: "stun:stun.l.google.com:19302"
+                }
+            ]
+        });
+        peerConnectionRef.current = peerConnection;
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit("ice-candidate", {
+                    // receiverId:receiverId,
+                    receiverId: otherUserId,
+                    candidate: event.candidate
+                });
+                console.log('ice candidate generated', event.candidate);
+            }
+        };
+        peerConnection.ontrack = (event) => {
+            console.log("remote audio received:", event.streams[0]);
+            remoteStreamRef.current = event.streams[0];
+
+            if (remoteAudioRef.current) {
+                remoteAudioRef.current.srcObject = event.streams[0];
+            }
+        };
+
+        console.log("peer connected created");
+        return peerConnection;
+    };
+    // get microphone (audio only for voice call)
+    const getLocalStream = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+            });
+            localStreamRef.current = stream;
+            console.log("Microphone access granted");
+            return stream;
+        } catch (error) {
+            console.error("microphone access failed:", error);
+            Toast.fire({
+                icon: "error",
+                title: "Microphone Access Denied",
+                text: "Please allow microphone permission to make voice calls",
+            });
+        }
+    };
+    // add the audio track
+    const addLocalTrack = (peerConnection, stream) => {
+        console.log(stream);
+        console.log(stream instanceof MediaStream);
+        stream.getTracks().forEach((track) => {
+            peerConnection.addTrack(track, stream);
+        });
+        console.log("local audio track added");
+    }
+    // create offer
+    const createOffer = async (peerConnection) => {
+        try {
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            console.log("offer Created:", offer);
+            return offer;
+        } catch (error) {
+            console.error("failed to create offer:", error);
+        }
+
+    }
+    useEffect(() => {
+        const handleIceCandidate = async (data) => {
+            console.log("ice candidate receive");
+            const peerConnection = peerConnectionRef.current;
+            if (!peerConnection) {
+                console.log("Peer connection not found");
+                return;
+            }
+            await peerConnection.addIceCandidate(data.candidate);
+            console.log("ice candidate added");
+        };
+        socket.on("ice-candidate", handleIceCandidate);
+        return () => {
+            socket.off("ice-candidate", handleIceCandidate);
+        };
+    }, []);
+    //end call logic
+    const handleEndCall = () => {
+        console.log("Ending Call");
+        setCallStatus("idle");
+        setIsMuted(false);
+        setCallDuration(0);
+        //web RTC close
+        if (peerConnectionRef.current) {
+            peerConnectionRef.current.close();
+            peerConnectionRef.current = null;
+        }
+        //stop microphone
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach((track) => {
+                track.stop();
+            });
+            localStreamRef.current = null;
+        }
+        //stop remote audio
+        if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = null;
+        }
+        remoteStreamRef.current = null;
+        const targetId = activeCallPartnerId || receiverId;
+        //notify other user
+        if (targetId) {
+            socket.emit("call-end", {
+                callerId: userId,
+                receiverId: targetId
+            });
+        }
+        console.log("call ended");
+        setActiveCallPartner(null);
+    };
+
+    useEffect(() => {
+        const handleCallEnded = () => {
+            console.log("call ended by other user");
+            setIsMuted(false);
+            setCallStatus("idle");
+            setCallDuration(0);
+            setActiveCallPartner(null);
+            Toast.fire({
+                icon: "info",
+                title: "Call Ended",
+                text: "The other user ended the call",
+            });
+            if (peerConnectionRef.current) {
+                peerConnectionRef.current.close();
+                peerConnectionRef.current = null;
+            }
+            if (localStreamRef.current) {
+                localStreamRef.current.getTracks().forEach((track) => {
+                    track.stop();
+                });
+                localStreamRef.current = null;
+                remoteStreamRef.current = null;
+            }
+            if (remoteAudioRef.current) {
+                remoteAudioRef.current.srcObject = null;
+            }
+        };
+        socket.on("call-ended", handleCallEnded);
+        return () => {
+            socket.off("call-ended", handleCallEnded);
+        };
+    }, []);
+
+    const toggleMuted = () => {
+        const stream = localStreamRef.current;
+        if (!stream) {
+            console.log("local stream not found");
+            return;
+        }
+        const audioTrack = stream.getAudioTracks()[0];
+        if (!audioTrack) {
+            console.log("Audio track not found");
+            return;
+        }
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMuted(!audioTrack.enabled);
+        console.log(audioTrack.enabled ? "microphone unmuted" : "microphone muted");
+    };
+
+    useEffect(() => {
+        let timer;
+        if (callStatus === "connected") {
+            timer = setInterval(() => {
+                setCallDuration((prev) => prev + 1);
+            }, 1000);
+        }
+        return () => {
+            clearInterval(timer);
+        };
+    }, [callStatus]);
+
+    // format the second
+    const formatCallDuration = (seconds) => {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+    };
+
+
+
+
+
 
 
     return (
@@ -439,9 +777,20 @@ try{
             fileInputRef={fileInputRef}
             handleFileChange={handleFileChange}
             selectedFile={selectedFile}
-            handleSendAttachment= {handleSendAttachment}
+            handleSendAttachment={handleSendAttachment}
             cancelAttachment={cancelAttachment}
             setSelectedFile={setSelectedFile}
+            handleStartCall={handleStartCall}
+            handleAcceptCall={handleAcceptCall}
+            handleRejectCall={handleRejectCall}
+            incomingCall={incomingCall}
+            remoteAudioRef={remoteAudioRef}
+            handleEndCall={handleEndCall}
+            callStatus={callStatus}
+            isMuted={isMuted}
+            toggleMuted={toggleMuted}
+            callDuration={callDuration}
+            formatCallDuration={formatCallDuration}
         />
     );
 }

@@ -11,19 +11,19 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ChatUser from "./pages/Chat";
 import { useEffect } from "react";
-import{socket} from "./socket";
+import { socket } from "./socket";
 function App() {
-    useEffect(()=>{
-        socket.on("connect",()=>{
-            console.log("Connected:",socket.id);
+    useEffect(() => {
+        socket.on("connect", () => {
+            console.log("Connected:", socket.id);
         });
-    },[]);
+    }, []);
     return (
         <BrowserRouter>
-        <Navbar/>
+            <Navbar />
 
             <Routes>
-                <Route path="/chat" element = {
+                <Route path="/chat" element={
                     <ProtectedRoute>
                         <ChatUser />
                     </ProtectedRoute>
@@ -36,15 +36,15 @@ function App() {
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/verify-otp" element={<VerifyOtp />} />
-                <Route path="/profile" element = {
+                <Route path="/profile" element={
                     <ProtectedRoute>
-                        <Profile/>
+                        <Profile />
                     </ProtectedRoute>
                 }
                 />
             </Routes>
 
-            </BrowserRouter>
+        </BrowserRouter>
     );
 }
 
