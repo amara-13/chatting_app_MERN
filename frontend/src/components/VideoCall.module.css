@@ -1,0 +1,162 @@
+/* VideoCall.module.css */
+
+.callBox {
+  position: fixed;
+  background: #0f172a;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.15);
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  cursor: default;
+  transition: box-shadow 0.2s ease;
+}
+
+.header {
+  height: 40px;
+  background: #1e293b;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: grab;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.header:active {
+  cursor: grabbing;
+}
+
+.headerBtn {
+  color: #94a3b8;
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.headerBtn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.closeBtn:hover {
+  color: #fb7185;
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.videoContainer {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  height: calc(100% - 40px);
+  background: #090d16;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remoteVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #090d16;
+}
+
+.localVideo {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 130px;
+  height: 90px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  object-fit: cover;
+  background: #1e293b;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+  z-index: 10;
+}
+
+.controls {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(10px);
+  padding: 6px 14px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 20;
+}
+
+/* 4-Corner Stretch Handles */
+.resizeSE {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  cursor: se-resize;
+  z-index: 30;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 4px;
+}
+
+.resizeNW {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  cursor: nw-resize;
+  z-index: 30;
+}
+
+.resizeNE {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  cursor: ne-resize;
+  z-index: 30;
+}
+
+.resizeSW {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  cursor: sw-resize;
+  z-index: 30;
+}
+
+.gripDots {
+  width: 14px;
+  height: 14px;
+  opacity: 0.6;
+  pointer-events: none;
+  background: radial-gradient(circle, #ffffff 1.5px, transparent 1.5px);
+  background-size: 5px 5px;
+  border-bottom-right-radius: 8px;
+}

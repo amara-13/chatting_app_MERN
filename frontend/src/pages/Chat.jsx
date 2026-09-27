@@ -4,18 +4,6 @@ import Swal from "sweetalert2";
 import { fetchUsers, sendMessageApi, fetchMessagesApi, sendVoiceApi, sendAttachmentApi } from "../services/ChatService";
 import { socket } from "../socket";
 
-const Toast = Swal.mixin({
-    toast: true,
-    position: "top-end",
-    showConfirmButton: false,
-    timer: 3000,
-    timerProgressBar: true,
-    didOpen: (toast) => {
-        toast.onmouseenter = Swal.stopTimer;
-        toast.onmouseleave = Swal.resumeTimer;
-    },
-});
-
 function ChatUser() {
     //   login user info
     const userString = localStorage.getItem("user");
@@ -42,6 +30,10 @@ function ChatUser() {
     const [isMuted, setIsMuted] = useState(false);
     const [callDuration, setCallDuration] = useState(0);
     const [activeCallPartnerId, setActiveCallPartner] = useState(null);
+    const [isVideoCameraOff, setIsVideoCameraOff] = useState(false);
+    const [showVideoCall, setShowVideoCall] = useState(false);
+    const [localStream, setLocalStream] = useState(null);
+    const [remoteStream, setRemoteStream] = useState(null);
 
     // Refs
     const typingRef = useRef(null);
@@ -57,6 +49,8 @@ function ChatUser() {
     const localStreamRef = useRef(null);
     const remoteStreamRef = useRef(null);
     const remoteAudioRef = useRef(null);
+    const localVideoRef = useRef(null);
+    const remoteVideoRef = useRef(null);
 
 
 
@@ -482,11 +476,23 @@ function ChatUser() {
         setCallStatus("connected");
         setActiveCallPartner(incomingCall.callerId);
 
+        const isVideo = incomingCall.callType === "video";
+        if (isVideo) {
+            setShowVideoCall(true);
+            setIsVideoCameraOff(false);
+        }
+
         const peerConnection = createPeerConnection(incomingCall.callerId);
         console.log("peer connection:", peerConnection);
 
-        const stream = await getLocalStream();
+        const stream = isVideo ?
+            await getVideoStream()
+            : await getLocalStream();
+
         if (!stream) return;
+        if (isVideo && localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+        }
         console.log("stream created", stream);
         await addLocalTrack(peerConnection, stream);
         console.log(" addlocaltrack");
@@ -521,10 +527,17 @@ function ChatUser() {
         const handleCallRejected = () => {
             console.log("call rejected ");
             setCallStatus("idle");
-            Toast.fire({
+            setShowVideoCall(false);
+            setLocalStream(null);
+            setRemoteStream(null);
+            Swal.fire({
                 icon: "error",
                 title: "Call Declined",
                 text: "User declined your call",
+                timer: 2000,
+                showConfirmButton: false,
+                toast: true,
+                position: "top-end"
             });
 
             if (peerConnectionRef.current) {
@@ -580,33 +593,36 @@ function ChatUser() {
             }
         };
         peerConnection.ontrack = (event) => {
-            console.log("remote audio received:", event.streams[0]);
+            console.log("remote track received:", event.streams[0]);
             remoteStreamRef.current = event.streams[0];
+            setRemoteStream(event.streams[0]);
 
             if (remoteAudioRef.current) {
                 remoteAudioRef.current.srcObject = event.streams[0];
+            }
+
+            if (remoteVideoRef.current) {
+                remoteVideoRef.current.srcObject = event.streams[0];
             }
         };
 
         console.log("peer connected created");
         return peerConnection;
     };
-    // get microphone (audio only for voice call)
+    // get microphone
     const getLocalStream = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: true,
             });
             localStreamRef.current = stream;
-            console.log("Microphone access granted");
+            setLocalStream(stream);
+
+            console.log("microphone Access granted");
             return stream;
         } catch (error) {
             console.error("microphone access failed:", error);
-            Toast.fire({
-                icon: "error",
-                title: "Microphone Access Denied",
-                text: "Please allow microphone permission to make voice calls",
-            });
+            return null;
         }
     };
     // add the audio track
@@ -652,6 +668,10 @@ function ChatUser() {
         setCallStatus("idle");
         setIsMuted(false);
         setCallDuration(0);
+        setIsVideoCameraOff(false);
+        setShowVideoCall(false);
+        setLocalStream(null);
+        setRemoteStream(null);
         //web RTC close
         if (peerConnectionRef.current) {
             peerConnectionRef.current.close();
@@ -677,6 +697,14 @@ function ChatUser() {
                 receiverId: targetId
             });
         }
+        if (localVideoRef.current) {
+            localVideoRef.current.srcObject = null;
+        }
+        if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = null;
+        }
+
+
         console.log("call ended");
         setActiveCallPartner(null);
     };
@@ -688,10 +716,18 @@ function ChatUser() {
             setCallStatus("idle");
             setCallDuration(0);
             setActiveCallPartner(null);
-            Toast.fire({
+            setIsVideoCameraOff(false);
+            setShowVideoCall(false);
+            setLocalStream(null);
+            setRemoteStream(null);
+            Swal.fire({
                 icon: "info",
                 title: "Call Ended",
                 text: "The other user ended the call",
+                timer: 2500,
+                showConfirmButton: false,
+                toast: true,
+                position: "top-end"
             });
             if (peerConnectionRef.current) {
                 peerConnectionRef.current.close();
@@ -746,14 +782,120 @@ function ChatUser() {
     const formatCallDuration = (seconds) => {
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;
-        return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+        return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`
+    };
+
+    const toggleCamera = async () => {
+        let stream = localStreamRef.current;
+        if (!stream) {
+            stream = await getVideoStream();
+            if (!stream) return;
+            setShowVideoCall(true);
+            setIsVideoCameraOff(false);
+            return;
+        }
+
+        let videoTrack = stream.getVideoTracks()[0];
+        if (!videoTrack) {
+            // Audio-only call upgrading to video
+            try {
+                const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const newVideoTrack = videoStream.getVideoTracks()[0];
+                if (newVideoTrack) {
+                    stream.addTrack(newVideoTrack);
+                    if (peerConnectionRef.current) {
+                        peerConnectionRef.current.addTrack(newVideoTrack, stream);
+                    }
+                    videoTrack = newVideoTrack;
+                    setLocalStream(new MediaStream(stream.getTracks()));
+                    setShowVideoCall(true);
+                    setIsVideoCameraOff(false);
+                    return;
+                }
+            } catch (err) {
+                console.error("Camera access failed:", err);
+                Swal.fire({
+                    icon: "error",
+                    title: "Camera Access Denied",
+                    text: "Could not access your camera.",
+                });
+                return;
+            }
+        }
+
+        if (videoTrack) {
+            videoTrack.enabled = !videoTrack.enabled;
+            const isOff = !videoTrack.enabled;
+            setIsVideoCameraOff(isOff);
+            if (!isOff) {
+                setShowVideoCall(true);
+            }
+            console.log(videoTrack.enabled ? "Camera on" : "Camera off");
+        }
+    };
+
+    // for video call
+    const getVideoStream = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: true,
+            });
+            localStreamRef.current = stream;
+            setLocalStream(stream);
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = stream;
+            }
+            console.log("Camera and microphone access granted");
+            return stream;
+        }
+        catch (error) {
+            console.error("Camera/microphone access failed:", error);
+
+            Swal.fire({
+                icon: "error",
+                title: "Camera Access Denied",
+                text: "Please allow camera and microphone permission",
+            });
+            return null;
+        }
+    };
+
+    const handleStartVideoCall = async () => {
+        if (!userId || !receiverId)
+            return;
+        console.log("starting video call ...");
+
+        setCallStatus("calling");
+        setActiveCallPartner(receiverId);
+        setIsVideoCameraOff(false);
+        setShowVideoCall(true);
+        const peerConnection = createPeerConnection(receiverId);
+        const stream = await getVideoStream();
+        if (!stream) {
+            setCallStatus("idle");
+            setShowVideoCall(false);
+            return;
+        }
+        addLocalTrack(peerConnection, stream);
+        if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+        }
+        const offer = await createOffer(peerConnection);
+        console.log("Video offer ready:", offer);
+        socket.emit("call-user", {
+            callerId: userId,
+            receiverId: receiverId,
+            callType: "video",
+            offer: offer,
+        });
     };
 
 
 
 
 
-
+    const activeCallPartner = user.find(u => u._id === activeCallPartnerId) || user.find(u => u._id === receiverId);
 
     return (
         <Chat
@@ -791,6 +933,16 @@ function ChatUser() {
             toggleMuted={toggleMuted}
             callDuration={callDuration}
             formatCallDuration={formatCallDuration}
+            localVideoRef={localVideoRef}
+            remoteVideoRef={remoteVideoRef}
+            toggleCamera={toggleCamera}
+            isVideoCameraOff={isVideoCameraOff}
+            handleStartVideoCall={handleStartVideoCall}
+            activeCallPartner={activeCallPartner}
+            showVideoCall={showVideoCall}
+            setShowVideoCall={setShowVideoCall}
+            localStream={localStream}
+            remoteStream={remoteStream}
         />
     );
 }

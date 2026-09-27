@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-
+import VideoCall from "./VideoCall";
 function Chat({
   users = [],
   connectedUser = [],
@@ -24,6 +24,7 @@ function Chat({
   handleSendAttachment,
   cancelAttachment,
   handleStartCall,
+  handleStartVideoCall,
   handleAcceptCall,
   handleRejectCall,
   incomingCall,
@@ -34,6 +35,15 @@ function Chat({
   isMuted,
   callDuration,
   formatCallDuration,
+  localVideoRef,
+  remoteVideoRef,
+  localStream,
+  remoteStream,
+  toggleCamera,
+  isVideoCameraOff,
+  showVideoCall,
+  setShowVideoCall,
+  activeCallPartner: activeCallPartnerFromProps,
 }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,7 +68,7 @@ function Chat({
 
   }, [messages, isTyping]);
   const caller = users.find(user => user._id === incomingCall?.callerId);
-  const activeCallPartner = selectedUser || caller || users.find(u => u._id === incomingCall?.callerId);
+  const activeCallPartner = activeCallPartnerFromProps || selectedUser || caller || users.find(u => u._id === incomingCall?.callerId);
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-slate-100 flex justify-center items-center p-4 md:p-6">
@@ -71,7 +81,7 @@ function Chat({
             <div className="flex items-center gap-3">
               <div className="relative">
                 <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white flex items-center justify-center text-lg animate-bounce">
-                  📞
+                  {incomingCall.callType === "video" ? "📹" : "📞"}
                 </div>
                 <span className="absolute -inset-1 rounded-full border-2 border-emerald-300/50 animate-ping"></span>
               </div>
@@ -81,7 +91,7 @@ function Chat({
                 </p>
                 <p className="text-xs text-emerald-100 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
-                  Incoming voice call
+                  {incomingCall.callType === "video" ? "Incoming video call" : "Incoming voice call"}
                 </p>
               </div>
             </div>
@@ -100,7 +110,7 @@ function Chat({
                 onClick={handleAcceptCall}
                 className="px-4 py-1.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold shadow-lg shadow-emerald-950/30 transition flex items-center gap-1 cursor-pointer animate-pulse"
               >
-                📞 Answer
+                {incomingCall.callType === "video" ? "📹 Answer Video" : "📞 Answer"}
               </button>
             </div>
           </div>
@@ -197,6 +207,19 @@ function Chat({
                 {isMuted ? "🔇 Unmute" : "🎙️ Mute"}
               </button>
 
+              {/* Camera Video Toggle Button */}
+              <button
+                type="button"
+                onClick={toggleCamera}
+                className={`cursor-pointer px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition ${
+                  isVideoCameraOff || !showVideoCall
+                    ? "bg-slate-700 hover:bg-slate-600 text-slate-200"
+                    : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/30"
+                }`}
+                title={isVideoCameraOff || !showVideoCall ? "Turn camera on" : "Turn camera off"}
+              >
+                {isVideoCameraOff || !showVideoCall ? "📷 Video Off" : "📹 Video On"}
+              </button>
 
               {/* End Call Button */}
               <button
@@ -208,6 +231,7 @@ function Chat({
               </button>
             </div>
           </div>
+
         )}
 
         {/* Main Chat Interface Body (Sidebar + Chat Area) */}
@@ -375,14 +399,22 @@ function Chat({
                   </button> */}
                     {connectedUser.includes(selectedUser._id) && (
                       <>
-                      <button type="button" onClick={handleStartCall}
-                        className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"
-                        title="Call"
-                      >
-                        📞
-                      </button >
-                      <button type="button"  onClick ={()=>{window.open("/video-call","_blank")}} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"
-    title="Video Call">📹</button>
+                        <button
+                          type="button"
+                          onClick={handleStartCall}
+                          className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer"
+                          title="Audio Call"
+                        >
+                          📞
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleStartVideoCall}
+                          className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer"
+                          title="Video Call"
+                        >
+                          📹
+                        </button>
                       </>
                     )}
 
@@ -634,6 +666,23 @@ function Chat({
 
               </>
 
+            )}
+            {showVideoCall && (callStatus === "connected" || callStatus === "calling") && (
+              <VideoCall
+                localVideoRef={localVideoRef}
+                remoteVideoRef={remoteVideoRef}
+                localStream={localStream}
+                remoteStream={remoteStream}
+                callDuration={callDuration}
+                formatCallDuration={formatCallDuration}
+                isMuted={isMuted}
+                toggleMuted={toggleMuted}
+                toggleCamera={toggleCamera}
+                isVideoCameraOff={isVideoCameraOff}
+                handleEndCall={handleEndCall}
+                activeCallPartner={activeCallPartner}
+                onClose={() => setShowVideoCall(false)}
+              />
             )}
             <audio ref={remoteAudioRef} autoPlay className="hidden" />
           </div>
