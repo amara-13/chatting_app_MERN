@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import Chat from "../components/Chat";
 import Swal from "sweetalert2";
-import { fetchUsers, sendMessageApi, fetchMessagesApi, sendVoiceApi, sendAttachmentApi } from "../services/ChatService";
+import { fetchUsers, sendMessageApi, fetchMessagesApi, sendVoiceApi, sendAttachmentApi,getFriendApi} from "../services/ChatService";
 import { socket } from "../socket";
 
 function ChatUser() {
@@ -9,6 +9,7 @@ function ChatUser() {
     const userString = localStorage.getItem("user");
     const userId = userString ? JSON.parse(userString).id : null;
     const userEmail = userString ? JSON.parse(userString).email : null;
+    const token = localStorage.getItem("token");
 
     // component states
 
@@ -58,14 +59,34 @@ function ChatUser() {
 
 
     // Fetch all user list
-    const fetchUser = async () => {
-        try {
-            const response = await fetchUsers();
-            if (response && response.data) {
-                const otherUser = response.data.filter(u => u._id !== userId);
-                setUser(otherUser);
+    // const fetchUser = async () => {
+    //     try {
+    //         const response = await fetchUsers();
+    //         if (response && response.data) {
+    //             const otherUser = response.data.filter(u => u._id !== userId);
+    //             setUser(otherUser);
+    //         } else {
+    //             Swal.fire({
+    //                 title: "Failed",
+    //                 text: "Failed to fetch users"
+    //             });
+    //         }
+    //     } catch (error) {
+    //         console.error("Failed to fetch users:", error);
+    //     }
+    // };
+    const fetchUser =async()=>{
+        try{
+        if(!token) return;
+        const response = await getFriendApi(token);
+         if (response && response.friendships) {
+                const friendList = response.friendships.map((f)=>{
+                    return f.sender._id===userId ?f.receiver:f.sender;
+                });
+                setUser(friendList);
             } else {
                 Swal.fire({
+                    icon: "error",
                     title: "Failed",
                     text: "Failed to fetch users"
                 });
@@ -79,7 +100,7 @@ function ChatUser() {
     const loadMessages = async (selectedReceiverId) => {
         if (!userId || !selectedReceiverId) return;
         try {
-            const response = await fetchMessagesApi(userId, selectedReceiverId);
+            const response = await fetchMessagesApi(userId, selectedReceiverId, token);
             if (response && response.data) {
                 setMessages(response.data);
             }
@@ -506,7 +527,7 @@ function ChatUser() {
             receiverId: userId,
             answer: answer
         });
-        setIncomingCall(null);
+      setIncomingCall(null);
     };
 
     const handleRejectCall = () => {
@@ -572,7 +593,7 @@ function ChatUser() {
         };
     }, []);
 
-    //create peer connection
+    //create peer connection 
     const createPeerConnection = (otherUserId) => {
         const peerConnection = new RTCPeerConnection({
             iceServers: [

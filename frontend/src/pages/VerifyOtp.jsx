@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import axios from 'axios';
 import Swal from "sweetalert2";
+import { Mail, KeyRound, Loader2, CheckCircle2, ArrowLeft } from "lucide-react";
+
 function VerifyOtp() {
     const location = useLocation();
     const navigate = useNavigate();
@@ -16,7 +18,8 @@ function VerifyOtp() {
 
         if (!email || !otp) {
             Swal.fire({
-                title: "please enter both email and otp",
+                title: "Incomplete details",
+                text: "Please enter both email and OTP code",
                 icon: "error",
             });
             return;
@@ -31,6 +34,8 @@ function VerifyOtp() {
                 title: "Email Verified",
                 text: response.data.message || "Email verified successfully",
                 icon: "success",
+                timer: 1500,
+                showConfirmButton: false,
             }).then(() => {
                 navigate("/login");
 
@@ -69,90 +74,99 @@ function VerifyOtp() {
             });
         }
     };
+
     return (
-        <div className="bg-gradient-to-r from-green-300 via-blue-200 to-sky-300 min-h-screen flex items-center justify-center px-4">
+        <div className="relative min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-8 bg-[#FAF5FF]">
+            <div className="absolute top-1/4 left-1/3 w-80 h-80 bg-[#FDA4AF] blur-3xl -z-10 rounded-full pointer-events-none opacity-40" />
+            <div className="absolute bottom-10 right-1/4 w-72 h-72 bg-[#99F6E4] blur-3xl -z-10 rounded-full pointer-events-none opacity-40" />
+            <div className="absolute top-10 right-10 w-60 h-60 bg-[#FED7AA] blur-3xl -z-10 rounded-full pointer-events-none opacity-40" />
 
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
-
-                <div className="text-center mb-6">
-                    <h2 className="text-3xl font-bold text-gray-800">
+            <div className="w-full max-w-md bg-white/95 backdrop-blur-md rounded-3xl shadow-xl shadow-[#C4B5FD]/10 border border-[#C4B5FD]/40 p-8 sm:p-10">
+                <div className="text-center mb-7">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#FDA4AF] to-[#C4B5FD] text-[#1E1B4B] flex items-center justify-center mx-auto mb-4 shadow-md shadow-[#FDA4AF]/25">
+                        <CheckCircle2 className="w-7 h-7 bg-danger-400 text-[#1E1B4B]" />
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-[#1E1B4B] tracking-tight">
                         Verify Email
                     </h2>
-
-                    <p className="text-gray-500 mt-1">
-                        Enter the 6-digit OTP sent to your email
+                    <p className="text-xs sm:text-sm text-[#1E1B4B]/70 mt-1.5">
+                        Enter the 6-digit confirmation code sent to your email
                     </p>
                 </div>
 
                 <form onSubmit={handleVerify} className="space-y-4">
-
                     {/* Email Input */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Email
+                        <label className="block text-xs font-bold text-[#1E1B4B] mb-1.5">
+                            Email Address
                         </label>
-
-                        <input
-                            type="email"
-                            placeholder="Enter your email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-4 py-2 border rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                            required
-                        />
+                        <div className="relative">
+                            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4B5FD]" />
+                            <input
+                                type="email"
+                                placeholder="you@example.com"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-[#FAF5FF] rounded-xl border border-[#C4B5FD]/40 focus:bg-white focus:border-[#C4B5FD] focus:ring-2 focus:ring-[#99F6E4]/40 outline-none transition text-[#1E1B4B]"
+                                required
+                            />
+                        </div>
                     </div>
 
                     {/* OTP Input */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Enter OTP
+                        <label className="block text-xs font-bold text-[#1E1B4B] mb-1.5">
+                            6-Digit OTP Code
                         </label>
-
-                        <input
-                            type="text"
-                            maxLength="6"
-                            placeholder="e.g. 123456"
-                            value={otp}
-                            onChange={(e) => setOtp(e.target.value)}
-                            className="w-full block  mb-4 px-4 py-2 text-center tracking-widest text-xl font-bold border rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                            required
-                        />
-<hr />
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-sky-600 text-white py-2 rounded-md font-semibold hover:bg-sky-700 transition duration-200"
-                        >
-                            {loading ? "Verifying..." : "Verify OTP"}
-                        </button>
+                        <div className="relative">
+                            <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4B5FD]" />
+                            <input
+                                type="text"
+                                maxLength="6"
+                                placeholder="123456"
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 text-center tracking-widest text-lg font-bold bg-[#FAF5FF] rounded-xl border border-[#C4B5FD]/40 focus:bg-white focus:border-[#C4B5FD] focus:ring-2 focus:ring-[#99F6E4]/40 outline-none transition text-[#1E1B4B]"
+                                required
+                            />
+                        </div>
                     </div>
 
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#FDA4AF] to-[#FED7AA] hover:opacity-95 disabled:opacity-60 text-[#1E1B4B] py-3 rounded-2xl font-bold text-sm shadow-md shadow-[#FDA4AF]/25 transition-all cursor-pointer"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Verifying...</span>
+                            </>
+                        ) : (
+                            <span>Verify Email</span>
+                        )}
+                    </button>
                 </form>
 
-                <div className="text-center mt-5 space-y-2">
-
+                <div className="flex items-center justify-between pt-6 mt-6 border-t border-[#C4B5FD]/30 text-xs">
                     <button
                         type="button"
                         onClick={resendOtp}
-                        className="text-sky-600 text-sm font-semibold hover:underline"
+                        className="font-bold text-[#1E1B4B] hover:text-[#FDA4AF] cursor-pointer"
                     >
-                        Resend OTP
+                        Resend Code
                     </button>
-
-                    <div>
-                        <Link
-                            to="/register"
-                            className="text-gray-500 text-sm hover:underline"
-                        >
-                            Back to Register
-                        </Link>
-                    </div>
-
+                    <Link
+                        to="/register"
+                        className="inline-flex items-center gap-1 font-bold text-[#1E1B4B]/70 hover:text-[#1E1B4B]"
+                    >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span>Back to Register</span>
+                    </Link>
                 </div>
-
             </div>
-
         </div>
     );
-};
+}
+
 export default VerifyOtp;

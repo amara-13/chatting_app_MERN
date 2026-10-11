@@ -57,14 +57,15 @@ const [formData, setFormData] = useState({
         console.log(response.token);
         localStorage.setItem ("user",JSON.stringify(response.data));
         Swal.fire({
-        title:"login Successfully",
-        text:response.message || "User login Successfully",
-        icon:"success"
-    }).then(()=>{
-        // navigate("/profile");
-        window.location.href="/profile";
-    });
-}
+            title: "Welcome Back!",
+            text: response.message || "Logged in successfully",
+            icon: "success",
+            timer: 1200,
+            showConfirmButton: false,
+        }).then(() => {
+            window.location.href = "/users";
+        });
+    }
 }catch(error){
     const errorMsg = error.response?.data?.message|| error.message;
     Swal.fire({

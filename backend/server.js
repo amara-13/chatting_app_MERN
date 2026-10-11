@@ -141,6 +141,29 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Real-time friend request events
+    socket.on("friend-request-sent", (data) => {
+        console.log("friend-request-sent event:", data);
+        const { receiverId } = data;
+        const receiverSocketId = onlineUser[receiverId];
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit("friend-request-received", data);
+        } else {
+            socket.broadcast.emit("friend-request-received", data);
+        }
+    });
+
+    socket.on("friend-request-action", (data) => {
+        console.log("friend-request-action event:", data);
+        const { targetUserId } = data;
+        const targetSocketId = onlineUser[targetUserId];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit("friend-request-updated", data);
+        } else {
+            socket.broadcast.emit("friend-request-updated", data);
+        }
+    });
+
 
 
 
